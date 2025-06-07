@@ -118,7 +118,7 @@ class SubgraphDatabase:
 
             cursor.execute(
                 """
-                UPDATE subgraphs 
+                UPDATE subgraphs
                 SET parent_molecules = ?, frequency = ?
                 WHERE id = ?
             """,
@@ -128,7 +128,7 @@ class SubgraphDatabase:
             # Insert new entry
             cursor.execute(
                 """
-                INSERT INTO subgraphs 
+                INSERT INTO subgraphs
                 (subgraph_hash, size, adjacency_matrix, parent_molecules, frequency)
                 VALUES (?, ?, ?, ?, ?)
             """,
@@ -492,7 +492,7 @@ class MolecularVisualiser:
         edges2_counts = {k: len(v) for k, v in sg2_by_edges.items()}
 
         results_text = f"""GED Analysis Results
-        
+
 Approximate GED: {results["approximate_ged"]}
 Exact GED: {results.get("exact_ged", "N/A")}
 Tanimoto Coefficient: {results["tanimoto_coefficient"]}
