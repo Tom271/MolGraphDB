@@ -158,7 +158,7 @@ class SubgraphDatabase:
                     "hash": row[0],
                     "adjacency_matrix": json.loads(row[1]),
                     "frequency": row[2],
-                }
+                },
             )
 
         return results
@@ -194,43 +194,51 @@ class MolecularGraphAnalyser:
         return G
 
     def generate_all_subgraphs(
-        self, G: nx.Graph, max_size: int = None
+        self,
+        G: nx.Graph,
+        max_size: int = None,
     ) -> List[nx.Graph]:
-        """Generate all connected subgraphs up to max_size"""
+        """Generate all connected subgraphs up to max_size, excluding single nodes"""
         if max_size is None:
             max_size = len(G.nodes())
 
         subgraphs = []
         nodes = list(G.nodes())
+        seen_hashes = set()  # Track canonical hashes to avoid duplicates
 
-        # Generate subgraphs of all sizes
-        for size in range(1, min(max_size + 1, len(nodes) + 1)):
+        # Generate subgraphs of all sizes (starting from 2 nodes to exclude single nodes)
+        for size in range(2, min(max_size + 1, len(nodes) + 1)):
             for node_subset in combinations(nodes, size):
                 subgraph = G.subgraph(node_subset)
-                if nx.is_connected(subgraph):
-                    subgraphs.append(subgraph.copy())
+                if nx.is_connected(subgraph) and len(subgraph.edges()) > 0:
+                    # Check if we've seen this structure before
+                    canonical_hash = self.graph_to_canonical_hash(subgraph)
+                    if canonical_hash not in seen_hashes:
+                        seen_hashes.add(canonical_hash)
+                        subgraphs.append(subgraph.copy())
 
         return subgraphs
 
     def graph_to_canonical_hash(self, G: nx.Graph) -> str:
-        """Generate canonical hash for a graph (using adjacency matrix)"""
-        # Get canonical node ordering
-        nodes = sorted(G.nodes())
-
-        # Create adjacency matrix
-        adj_matrix = []
-        for i in nodes:
-            row = []
-            for j in nodes:
-                if G.has_edge(i, j):
-                    row.append(1)
-                else:
-                    row.append(0)
-            adj_matrix.append(row)
-
-        # Convert to string for hashing
-        matrix_str = str(adj_matrix)
-        return str(hash(matrix_str))
+        """Generate canonical hash for a graph using graph isomorphism"""
+        # Use NetworkX's weisfeiler_lehman_graph_hash for canonical representation
+        # This properly handles graph isomorphism (same structure, different node labels)
+        try:
+            return nx.weisfeiler_lehman_graph_hash(G)
+        except:
+            # Fallback to adjacency matrix approach if WL hash fails
+            nodes = sorted(G.nodes())
+            adj_matrix = []
+            for i in nodes:
+                row = []
+                for j in nodes:
+                    if G.has_edge(i, j):
+                        row.append(1)
+                    else:
+                        row.append(0)
+                adj_matrix.append(row)
+            matrix_str = str(adj_matrix)
+            return str(hash(matrix_str))
 
     def populate_database(self, molecule_input: MoleculeInput):
         """Populate database with subgraphs from a molecule"""
@@ -238,7 +246,7 @@ class MolecularGraphAnalyser:
         G = self.mol_to_networkx(mol)
 
         logger.info(
-            f"Generating subgraphs for {molecule_input.name or molecule_input.smiles}"
+            f"Generating subgraphs for {molecule_input.name or molecule_input.smiles}",
         )
 
         subgraphs = self.generate_all_subgraphs(G)
@@ -275,7 +283,9 @@ class GraphEditDistanceCalculator:
         self.db = db
 
     def calculate_ged_approximation(
-        self, mol1: MoleculeInput, mol2: MoleculeInput
+        self,
+        mol1: MoleculeInput,
+        mol2: MoleculeInput,
     ) -> Dict:
         """Calculate approximate graph edit distance using subgraph overlap
         Based on the principle that similar molecules share more subgraphs
@@ -364,6 +374,301 @@ class MolecularVisualiser:
         plt.show()
 
     @staticmethod
+    def networkx_to_rdkit_subgraph(
+        parent_mol: Chem.Mol,
+        subgraph_nodes: List[int],
+    ) -> Chem.Mol:
+        """Convert NetworkX subgraph back to RDKit mol for visualisation"""
+        # Create a new molecule with only the subgraph atoms
+        new_mol = Chem.RWMol()
+
+        # Map old atom indices to new ones
+        atom_map = {}
+        for i, old_idx in enumerate(sorted(subgraph_nodes)):
+            atom = parent_mol.GetAtomWithIdx(old_idx)
+            new_atom = Chem.Atom(atom.GetSymbol())
+            new_idx = new_mol.AddAtom(new_atom)
+            atom_map[old_idx] = new_idx
+
+        # Add bonds between atoms in the subgraph
+        for bond in parent_mol.GetBonds():
+            begin_idx = bond.GetBeginAtomIdx()
+            end_idx = bond.GetEndAtomIdx()
+
+            if begin_idx in subgraph_nodes and end_idx in subgraph_nodes:
+                new_mol.AddBond(
+                    atom_map[begin_idx],
+                    atom_map[end_idx],
+                    bond.GetBondType(),
+                )
+
+        # Sanitise and return
+        try:
+            Chem.SanitizeMol(new_mol)
+            return new_mol
+        except:
+            return None
+
+    @staticmethod
+    def draw_subgraphs_comparison(
+        mol1_smiles: str,
+        mol2_smiles: str,
+        results: Dict,
+        mol1_name: str = "Molecule 1",
+        mol2_name: str = "Molecule 2",
+    ) -> None:
+        """Create comprehensive visualisation with subgraphs ordered by edge count"""
+        mol1 = Chem.MolFromSmiles(mol1_smiles)
+        mol2 = Chem.MolFromSmiles(mol2_smiles)
+
+        if mol1 is None or mol2 is None:
+            logger.error("Could not parse one or both SMILES strings")
+            return
+
+        # Generate subgraph data
+        db = SubgraphDatabase("molecular_subgraphs.db")
+        analyser = MolecularGraphAnalyser(db)
+
+        G1 = analyser.mol_to_networkx(mol1)
+        G2 = analyser.mol_to_networkx(mol2)
+
+        subgraphs1 = analyser.generate_all_subgraphs(G1)
+        subgraphs2 = analyser.generate_all_subgraphs(G2)
+
+        # Sort subgraphs by edge count (descending), then by node count
+        subgraphs1.sort(key=lambda sg: (len(sg.edges()), len(sg.nodes())), reverse=True)
+        subgraphs2.sort(key=lambda sg: (len(sg.edges()), len(sg.nodes())), reverse=True)
+
+        # Group subgraphs by edge count for display
+        sg1_by_edges = {}
+        sg2_by_edges = {}
+
+        for sg in subgraphs1:
+            edge_count = len(sg.edges())
+            if edge_count not in sg1_by_edges:
+                sg1_by_edges[edge_count] = []
+            sg1_by_edges[edge_count].append(sg)
+
+        for sg in subgraphs2:
+            edge_count = len(sg.edges())
+            if edge_count not in sg2_by_edges:
+                sg2_by_edges[edge_count] = []
+            sg2_by_edges[edge_count].append(sg)
+
+        # Find shared subgraphs using canonical hashes
+        hashes1 = {analyser.graph_to_canonical_hash(sg): sg for sg in subgraphs1}
+        hashes2 = {analyser.graph_to_canonical_hash(sg): sg for sg in subgraphs2}
+        shared_hashes = set(hashes1.keys()).intersection(set(hashes2.keys()))
+
+        # Create main comparison figure
+        fig = plt.figure(figsize=(20, 14))
+
+        # Main molecules
+        from rdkit.Chem import rdDepictor
+
+        rdDepictor.Compute2DCoords(mol1)
+        rdDepictor.Compute2DCoords(mol2)
+
+        # Top row: main molecules
+        ax_mol1 = plt.subplot2grid((5, 8), (0, 1), colspan=2)
+        ax_mol2 = plt.subplot2grid((5, 8), (0, 5), colspan=2)
+
+        img1 = Draw.MolToImage(mol1, size=(300, 300))
+        img2 = Draw.MolToImage(mol2, size=(300, 300))
+
+        ax_mol1.imshow(img1)
+        ax_mol1.set_title(f"{mol1_name}\n{mol1_smiles}", fontsize=12, fontweight="bold")
+        ax_mol1.axis("off")
+
+        ax_mol2.imshow(img2)
+        ax_mol2.set_title(f"{mol2_name}\n{mol2_smiles}", fontsize=12, fontweight="bold")
+        ax_mol2.axis("off")
+
+        # Results summary in the middle
+        ax_results = plt.subplot2grid((5, 8), (0, 3), colspan=2)
+
+        # Count unique subgraphs by edge count
+        edges1_counts = {k: len(v) for k, v in sg1_by_edges.items()}
+        edges2_counts = {k: len(v) for k, v in sg2_by_edges.items()}
+
+        results_text = f"""GED Analysis Results
+        
+Approximate GED: {results["approximate_ged"]}
+Exact GED: {results.get("exact_ged", "N/A")}
+Tanimoto Coefficient: {results["tanimoto_coefficient"]}
+
+Shared Subgraphs: {results["shared_subgraphs"]}
+Unique subgraphs in {mol1_name}: {len(subgraphs1)}
+Unique subgraphs in {mol2_name}: {len(subgraphs2)}
+
+Edge distribution:
+{mol1_name}: {dict(sorted(edges1_counts.items(), reverse=True))}
+{mol2_name}: {dict(sorted(edges2_counts.items(), reverse=True))}"""
+
+        ax_results.text(
+            0.5,
+            0.5,
+            results_text,
+            ha="center",
+            va="center",
+            fontsize=9,
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="lightblue", alpha=0.7),
+        )
+        ax_results.axis("off")
+
+        # Subgraphs visualisation ordered by edge count (descending)
+        all_edge_counts = sorted(
+            set(list(sg1_by_edges.keys()) + list(sg2_by_edges.keys())),
+            reverse=True,
+        )
+
+        row_offset = 1
+        for edge_count in all_edge_counts:
+            if row_offset >= 5:  # Prevent overflow
+                break
+
+            # Edge count label
+            ax_size = plt.subplot2grid((5, 8), (row_offset, 0))
+            ax_size.text(
+                0.5,
+                0.5,
+                f"{edge_count}\nedges",
+                ha="center",
+                va="center",
+                fontsize=11,
+                fontweight="bold",
+            )
+            ax_size.axis("off")
+
+            # Molecule 1 subgraphs for this edge count
+            mol1_sgs = sg1_by_edges.get(edge_count, [])
+            col_start = 1
+            for i, sg in enumerate(mol1_sgs[:3]):  # Limit to 3 per row
+                if col_start + i < 4:
+                    ax = plt.subplot2grid((5, 8), (row_offset, col_start + i))
+
+                    # Check if this subgraph is shared
+                    sg_hash = analyser.graph_to_canonical_hash(sg)
+                    is_shared = sg_hash in shared_hashes
+
+                    # Convert subgraph to RDKit mol for drawing
+                    sg_mol = MolecularVisualiser.networkx_to_rdkit_subgraph(
+                        mol1,
+                        list(sg.nodes()),
+                    )
+
+                    if sg_mol is not None:
+                        rdDepictor.Compute2DCoords(sg_mol)
+                        sg_img = Draw.MolToImage(sg_mol, size=(120, 120))
+                        ax.imshow(sg_img)
+
+                        # Colour border based on sharing
+                        border_colour = "red" if is_shared else "lightgray"
+                        border_width = 3 if is_shared else 1
+
+                        for spine in ax.spines.values():
+                            spine.set_edgecolor(border_colour)
+                            spine.set_linewidth(border_width)
+
+                    # Show structure info
+                    nodes_sorted = sorted(list(sg.nodes()))
+                    edges_list = [(min(e), max(e)) for e in sg.edges()]
+                    edges_sorted = sorted(edges_list)
+                    ax.set_title(f"N:{nodes_sorted}\nE:{edges_sorted}", fontsize=7)
+                    ax.axis("off")
+
+            # Molecule 2 subgraphs for this edge count
+            mol2_sgs = sg2_by_edges.get(edge_count, [])
+            col_start = 5
+            for i, sg in enumerate(mol2_sgs[:3]):  # Limit to 3 per row
+                if col_start + i < 8:
+                    ax = plt.subplot2grid((5, 8), (row_offset, col_start + i))
+
+                    # Check if this subgraph is shared
+                    sg_hash = analyser.graph_to_canonical_hash(sg)
+                    is_shared = sg_hash in shared_hashes
+
+                    # Convert subgraph to RDKit mol for drawing
+                    sg_mol = MolecularVisualiser.networkx_to_rdkit_subgraph(
+                        mol2,
+                        list(sg.nodes()),
+                    )
+
+                    if sg_mol is not None:
+                        rdDepictor.Compute2DCoords(sg_mol)
+                        sg_img = Draw.MolToImage(sg_mol, size=(120, 120))
+                        ax.imshow(sg_img)
+
+                        # Colour border based on sharing
+                        border_colour = "red" if is_shared else "lightgray"
+                        border_width = 3 if is_shared else 1
+
+                        for spine in ax.spines.values():
+                            spine.set_edgecolor(border_colour)
+                            spine.set_linewidth(border_width)
+
+                    # Show structure info
+                    nodes_sorted = sorted(list(sg.nodes()))
+                    edges_list = [(min(e), max(e)) for e in sg.edges()]
+                    edges_sorted = sorted(edges_list)
+                    ax.set_title(f"N:{nodes_sorted}\nE:{edges_sorted}", fontsize=7)
+                    ax.axis("off")
+
+            row_offset += 1
+
+        # Legend
+        legend_ax = plt.subplot2grid((5, 8), (4, 3), colspan=2)
+        legend_text = """Red border = Shared subgraph (same structure)
+Gray border = Unique subgraph
+N: = Node indices, E: = Edge pairs
+Ordered by edge count (descending)"""
+        legend_ax.text(
+            0.5,
+            0.5,
+            legend_text,
+            ha="center",
+            va="center",
+            fontsize=9,
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow"),
+        )
+        legend_ax.axis("off")
+
+        plt.suptitle(
+            f"Molecular Subgraph Comparison (by Edge Count): {mol1_name} vs {mol2_name}",
+            fontsize=16,
+            fontweight="bold",
+        )
+        plt.tight_layout()
+        plt.show()
+
+        # Print detailed subgraph analysis
+        print("\nDetailed Subgraph Analysis:")
+        print(f"{'=' * 50}")
+        print(f"{mol1_name} ({mol1_smiles}):")
+        for edge_count in sorted(sg1_by_edges.keys(), reverse=True):
+            sgs = sg1_by_edges[edge_count]
+            print(f"  {edge_count} edges: {len(sgs)} unique subgraph(s)")
+            for sg in sgs[:3]:  # Show first 3
+                nodes = sorted(list(sg.nodes()))
+                edges = sorted([(min(e), max(e)) for e in sg.edges()])
+                is_shared = analyser.graph_to_canonical_hash(sg) in shared_hashes
+                shared_mark = " [SHARED]" if is_shared else ""
+                print(f"    Nodes: {nodes}, Edges: {edges}{shared_mark}")
+
+        print(f"\n{mol2_name} ({mol2_smiles}):")
+        for edge_count in sorted(sg2_by_edges.keys(), reverse=True):
+            sgs = sg2_by_edges[edge_count]
+            print(f"  {edge_count} edges: {len(sgs)} unique subgraph(s)")
+            for sg in sgs[:3]:  # Show first 3
+                nodes = sorted(list(sg.nodes()))
+                edges = sorted([(min(e), max(e)) for e in sg.edges()])
+                is_shared = analyser.graph_to_canonical_hash(sg) in shared_hashes
+                shared_mark = " [SHARED]" if is_shared else ""
+                print(f"    Nodes: {nodes}, Edges: {edges}{shared_mark}")
+
+        db.close()
+
+    @staticmethod
     def compare_molecules(
         mol1_smiles: str,
         mol2_smiles: str,
@@ -372,57 +677,14 @@ class MolecularVisualiser:
         mol2_name: str = "Molecule 2",
     ) -> None:
         """Create side-by-side comparison of two molecules with results"""
-        mol1 = Chem.MolFromSmiles(mol1_smiles)
-        mol2 = Chem.MolFromSmiles(mol2_smiles)
-
-        if mol1 is None or mol2 is None:
-            logger.error("Could not parse one or both SMILES strings")
-            return
-
-        # Generate 2D coordinates
-        from rdkit.Chem import rdDepictor
-
-        rdDepictor.Compute2DCoords(mol1)
-        rdDepictor.Compute2DCoords(mol2)
-
-        # Create images
-        img1 = Draw.MolToImage(mol1, size=(300, 300))
-        img2 = Draw.MolToImage(mol2, size=(300, 300))
-
-        # Create comparison plot
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-        axes[0].imshow(img1)
-        axes[0].set_title(f"{mol1_name}\n{mol1_smiles}")
-        axes[0].axis("off")
-
-        axes[1].imshow(img2)
-        axes[1].set_title(f"{mol2_name}\n{mol2_smiles}")
-        axes[1].axis("off")
-
-        # Add results as text
-        results_text = f"""
-Graph Edit Distance Results:
-• Approximate GED: {results["approximate_ged"]}
-• Exact GED: {results.get("exact_ged", "N/A")}
-• Tanimoto Coefficient: {results["tanimoto_coefficient"]}
-• Shared Subgraphs: {results["shared_subgraphs"]}
-• Subgraphs in {mol1_name}: {results["total_subgraphs_mol1"]}
-• Subgraphs in {mol2_name}: {results["total_subgraphs_mol2"]}
-        """
-
-        plt.figtext(
-            0.5,
-            0.02,
-            results_text,
-            ha="center",
-            fontsize=10,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray"),
+        # Use the enhanced subgraph comparison
+        MolecularVisualiser.draw_subgraphs_comparison(
+            mol1_smiles,
+            mol2_smiles,
+            results,
+            mol1_name,
+            mol2_name,
         )
-
-        plt.tight_layout()
-        plt.subplots_adjust(bottom=0.25)
-        plt.show()
 
 
 def main():
@@ -452,8 +714,8 @@ def main():
         logger.info("Calculating graph edit distances...")
 
         # Example comparison: Butane vs Isopentane
-        mol1 = examples[0]  # Butane
-        mol2 = examples[1]  # Isopentane
+        mol1 = examples[3]  # Butane
+        mol2 = examples[4]  # Isopentane
 
         results = calculator.calculate_ged_approximation(mol1, mol2)
 
@@ -485,7 +747,7 @@ def main():
                 results = calculator.calculate_ged_approximation(mol_a, mol_b)
                 print(
                     f"{mol_a.name} vs {mol_b.name}: GED ≈ {results['approximate_ged']}, "
-                    f"Tanimoto = {results['tanimoto_coefficient']}"
+                    f"Tanimoto = {results['tanimoto_coefficient']}",
                 )
 
     except Exception as e:
