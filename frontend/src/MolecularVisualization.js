@@ -15,21 +15,21 @@ const MolecularVisualization = ({ results }) => {
     
     const numLevels = allEdgeCounts.size;
     const baseHeight = 400; // For molecules at top
-    const levelHeight = 140;
-    const paddingHeight = 150;
+    const levelHeight = 160;
+    const paddingHeight = 200;
     
     return Math.max(800, baseHeight + (numLevels * levelHeight) + paddingHeight);
   };
 
   // Configuration for tree layout
   const config = {
-    width: 1400,
+    width: 1600,
     height: calculateHeight(results),
     margin: { top: 50, right: 50, bottom: 50, left: 50 },
     moleculeSize: { width: 300, height: 250 },
-    subgraphSize: { width: 100, height: 80 },
-    levelHeight: 140,
-    nodeSpacing: 120,
+    subgraphSize: { width: 140, height: 110 },
+    levelHeight: 160,
+    nodeSpacing: 160,
   };
 
   useEffect(() => {
@@ -52,7 +52,10 @@ const MolecularVisualization = ({ results }) => {
     // Create tree layout data
     const treeData = createTreeLayout(results);
 
-    // Draw connections first (so they appear behind nodes)
+    // Draw column separators first (so they appear behind everything)
+    drawColumnSeparators(svg, svgNS);
+
+    // Draw connections (so they appear behind nodes)
     drawConnections(svg, treeData, svgNS);
 
     // Draw nodes
@@ -118,30 +121,30 @@ const MolecularVisualization = ({ results }) => {
       id: 'mol2'
     });
 
-    // Position subgraphs in tree levels
+    // Position subgraphs in tree levels with column organization
     sortedEdgeCounts.forEach((edgeCount, levelIndex) => {
       const levelY = moleculeY + config.moleculeSize.height + (levelIndex + 1) * config.levelHeight;
       
       const mol1Subgraphs = mol1Groups[edgeCount] || [];
       const mol2Subgraphs = mol2Groups[edgeCount] || [];
       
-      // Create a merged list for shared subgraphs
-      const allSubgraphsAtLevel = [];
+      // Separate subgraphs into three categories
+      const mol1UniqueSubgraphs = [];
+      const mol2UniqueSubgraphs = [];
+      const sharedSubgraphs = [];
       const processedShared = new Set();
 
-      // Add mol1 subgraphs
+      // Process mol1 subgraphs
       mol1Subgraphs.forEach(sg => {
         if (sharedIds.has(sg.id) && !processedShared.has(sg.id)) {
-          // This is a shared subgraph - position it in the center
-          allSubgraphsAtLevel.push({
+          sharedSubgraphs.push({
             ...sg,
             source: 'shared',
             parentMol: 'both'
           });
           processedShared.add(sg.id);
         } else if (!sharedIds.has(sg.id)) {
-          // This is unique to mol1
-          allSubgraphsAtLevel.push({
+          mol1UniqueSubgraphs.push({
             ...sg,
             source: 'mol1',
             parentMol: 'mol1'
@@ -149,10 +152,10 @@ const MolecularVisualization = ({ results }) => {
         }
       });
 
-      // Add mol2 subgraphs (only unique ones, shared ones are already added)
+      // Process mol2 subgraphs (only unique ones)
       mol2Subgraphs.forEach(sg => {
         if (!sharedIds.has(sg.id)) {
-          allSubgraphsAtLevel.push({
+          mol2UniqueSubgraphs.push({
             ...sg,
             source: 'mol2',
             parentMol: 'mol2'
@@ -160,22 +163,23 @@ const MolecularVisualization = ({ results }) => {
         }
       });
 
-      // Calculate positions for this level
-      const totalWidth = config.width - 2 * config.margin.left;
-      const availableWidth = totalWidth - config.subgraphSize.width;
-      const spacing = allSubgraphsAtLevel.length > 1 
-        ? availableWidth / (allSubgraphsAtLevel.length - 1) 
-        : 0;
+      // Define column boundaries
+      const leftColumnStart = config.margin.left;
+      const leftColumnEnd = mol1X + config.moleculeSize.width / 2;
+      const centerColumnStart = mol1X + config.moleculeSize.width / 2;
+      const centerColumnEnd = mol2X - config.moleculeSize.width / 2;
+      const rightColumnStart = mol2X - config.moleculeSize.width / 2;
+      const rightColumnEnd = config.width - config.margin.right;
 
-      allSubgraphsAtLevel.forEach((sg, index) => {
-        let x;
-        if (allSubgraphsAtLevel.length === 1) {
-          x = config.width / 2;
-        } else {
-          x = config.margin.left + config.subgraphSize.width / 2 + index * spacing;
-        }
+      // Position mol1 unique subgraphs in left column
+      mol1UniqueSubgraphs.forEach((sg, index) => {
+        const columnWidth = leftColumnEnd - leftColumnStart;
+        const spacing = mol1UniqueSubgraphs.length > 1 
+          ? columnWidth / (mol1UniqueSubgraphs.length + 1)
+          : columnWidth / 2;
+        const x = leftColumnStart + (index + 1) * spacing;
 
-        const node = {
+        layout.subgraphs.push({
           type: 'subgraph',
           data: sg,
           x: x,
@@ -184,12 +188,47 @@ const MolecularVisualization = ({ results }) => {
           level: levelIndex,
           edgeCount: edgeCount,
           source: sg.source
-        };
+        });
+      });
 
-        layout.subgraphs.push(node);
+      // Position shared subgraphs in center column
+      sharedSubgraphs.forEach((sg, index) => {
+        const columnWidth = centerColumnEnd - centerColumnStart;
+        const spacing = sharedSubgraphs.length > 1 
+          ? columnWidth / (sharedSubgraphs.length + 1)
+          : columnWidth / 2;
+        const x = centerColumnStart + (index + 1) * spacing;
 
-        // Store node for later connection processing
-        // We'll add connections after all nodes are positioned
+        layout.subgraphs.push({
+          type: 'subgraph',
+          data: sg,
+          x: x,
+          y: levelY,
+          id: sg.id,
+          level: levelIndex,
+          edgeCount: edgeCount,
+          source: sg.source
+        });
+      });
+
+      // Position mol2 unique subgraphs in right column
+      mol2UniqueSubgraphs.forEach((sg, index) => {
+        const columnWidth = rightColumnEnd - rightColumnStart;
+        const spacing = mol2UniqueSubgraphs.length > 1 
+          ? columnWidth / (mol2UniqueSubgraphs.length + 1)
+          : columnWidth / 2;
+        const x = rightColumnStart + (index + 1) * spacing;
+
+        layout.subgraphs.push({
+          type: 'subgraph',
+          data: sg,
+          x: x,
+          y: levelY,
+          id: sg.id,
+          level: levelIndex,
+          edgeCount: edgeCount,
+          source: sg.source
+        });
       });
     });
 
@@ -282,6 +321,79 @@ const MolecularVisualization = ({ results }) => {
         });
       }
     });
+  };
+
+  const drawColumnSeparators = (svg, svgNS) => {
+    const mol1X = config.width * 0.25;
+    const mol2X = config.width * 0.75;
+    
+    // Left separator (between mol1 column and center)
+    const leftSeparatorX = mol1X + config.moleculeSize.width / 2;
+    const leftLine = document.createElementNS(svgNS, 'line');
+    leftLine.setAttribute('x1', leftSeparatorX);
+    leftLine.setAttribute('y1', config.margin.top + config.moleculeSize.height);
+    leftLine.setAttribute('x2', leftSeparatorX);
+    leftLine.setAttribute('y2', config.height - config.margin.bottom);
+    leftLine.setAttribute('stroke', '#E5DDD0');
+    leftLine.setAttribute('stroke-width', '2');
+    leftLine.setAttribute('stroke-dasharray', '5,5');
+    leftLine.setAttribute('opacity', '0.5');
+    svg.appendChild(leftLine);
+    
+    // Right separator (between center and mol2 column)
+    const rightSeparatorX = mol2X - config.moleculeSize.width / 2;
+    const rightLine = document.createElementNS(svgNS, 'line');
+    rightLine.setAttribute('x1', rightSeparatorX);
+    rightLine.setAttribute('y1', config.margin.top + config.moleculeSize.height);
+    rightLine.setAttribute('x2', rightSeparatorX);
+    rightLine.setAttribute('y2', config.height - config.margin.bottom);
+    rightLine.setAttribute('stroke', '#E5DDD0');
+    rightLine.setAttribute('stroke-width', '2');
+    rightLine.setAttribute('stroke-dasharray', '5,5');
+    rightLine.setAttribute('opacity', '0.5');
+    svg.appendChild(rightLine);
+    
+    // Column labels
+    const labelY = config.margin.top + config.moleculeSize.height + 20;
+    
+    // Mol1 column label
+    const mol1Label = document.createElementNS(svgNS, 'text');
+    mol1Label.setAttribute('x', config.margin.left + (leftSeparatorX - config.margin.left) / 2);
+    mol1Label.setAttribute('y', labelY);
+    mol1Label.setAttribute('text-anchor', 'middle');
+    mol1Label.setAttribute('font-family', 'Arial, sans-serif');
+    mol1Label.setAttribute('font-size', '12');
+    mol1Label.setAttribute('font-weight', 'bold');
+    mol1Label.setAttribute('fill', '#644D0E');
+    mol1Label.setAttribute('opacity', '0.7');
+    mol1Label.textContent = 'Molecule 1 Subgraphs';
+    svg.appendChild(mol1Label);
+    
+    // Shared column label
+    const sharedLabel = document.createElementNS(svgNS, 'text');
+    sharedLabel.setAttribute('x', (leftSeparatorX + rightSeparatorX) / 2);
+    sharedLabel.setAttribute('y', labelY);
+    sharedLabel.setAttribute('text-anchor', 'middle');
+    sharedLabel.setAttribute('font-family', 'Arial, sans-serif');
+    sharedLabel.setAttribute('font-size', '12');
+    sharedLabel.setAttribute('font-weight', 'bold');
+    sharedLabel.setAttribute('fill', '#FF7300');
+    sharedLabel.setAttribute('opacity', '0.7');
+    sharedLabel.textContent = 'Shared Subgraphs';
+    svg.appendChild(sharedLabel);
+    
+    // Mol2 column label
+    const mol2Label = document.createElementNS(svgNS, 'text');
+    mol2Label.setAttribute('x', rightSeparatorX + (config.width - config.margin.right - rightSeparatorX) / 2);
+    mol2Label.setAttribute('y', labelY);
+    mol2Label.setAttribute('text-anchor', 'middle');
+    mol2Label.setAttribute('font-family', 'Arial, sans-serif');
+    mol2Label.setAttribute('font-size', '12');
+    mol2Label.setAttribute('font-weight', 'bold');
+    mol2Label.setAttribute('fill', '#5C5F28');
+    mol2Label.setAttribute('opacity', '0.7');
+    mol2Label.textContent = 'Molecule 2 Subgraphs';
+    svg.appendChild(mol2Label);
   };
 
   const calculateSubgraphSimilarity = (childNode, parentNode) => {
@@ -394,18 +506,20 @@ const MolecularVisualization = ({ results }) => {
       
       let fillColor = '#ffffff';
       let strokeColor = '#cccccc';
-      let strokeWidth = '2';
+      let strokeWidth = '3';
       
       if (sg.source === 'shared') {
         fillColor = '#FFF5ED';
         strokeColor = '#FF7300';
-        strokeWidth = '3';
+        strokeWidth = '4';
       } else if (sg.source === 'mol1') {
         fillColor = '#F5F2E8';
         strokeColor = '#644D0E';
+        strokeWidth = '3';
       } else if (sg.source === 'mol2') {
         fillColor = '#F5F6E8';
         strokeColor = '#5C5F28';
+        strokeWidth = '3';
       }
       
       rect.setAttribute('fill', fillColor);
@@ -417,20 +531,20 @@ const MolecularVisualization = ({ results }) => {
       if (sg.data.image) {
         const image = document.createElementNS(svgNS, 'image');
         image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', sg.data.image);
-        image.setAttribute('x', '5');
-        image.setAttribute('y', '5');
-        image.setAttribute('width', '60');
-        image.setAttribute('height', '45');
+        image.setAttribute('x', '8');
+        image.setAttribute('y', '8');
+        image.setAttribute('width', '90');
+        image.setAttribute('height', '70');
         group.appendChild(image);
       }
       
       // Edge count label
       const edgeText = document.createElementNS(svgNS, 'text');
       edgeText.setAttribute('x', config.subgraphSize.width / 2);
-      edgeText.setAttribute('y', config.subgraphSize.height - 5);
+      edgeText.setAttribute('y', config.subgraphSize.height - 8);
       edgeText.setAttribute('text-anchor', 'middle');
       edgeText.setAttribute('font-family', 'Arial, sans-serif');
-      edgeText.setAttribute('font-size', '10');
+      edgeText.setAttribute('font-size', '12');
       edgeText.setAttribute('font-weight', 'bold');
       edgeText.textContent = `${sg.edgeCount} edges`;
       group.appendChild(edgeText);

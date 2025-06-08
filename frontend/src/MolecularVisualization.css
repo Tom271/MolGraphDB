@@ -102,13 +102,23 @@
   }
   
   .visualization-svg {
-    min-width: 1200px;
+    min-width: 1400px;
     min-height: 600px;
   }
 
   .molecular-visualization {
     margin-top: 1rem;
     padding: 1rem;
+  }
+}
+
+@media (max-width: 1200px) {
+  .svg-container {
+    overflow-x: auto;
+  }
+  
+  .visualization-svg {
+    min-width: 1600px;
   }
 }
 
