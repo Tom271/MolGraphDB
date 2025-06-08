@@ -1,5 +1,5 @@
 [project]
-name = "python-project-template"
+name = "nearest_molecule_database"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -12,7 +12,9 @@ dependencies = [
     "pydantic>=2.11.5",
     "pytest-cov>=6.0.0",
     "rdkit>=2025.3.2",
+    "rich>=14.0.0",
     "scipy>=1.15.3",
+    "tqdm>=4.67.1",
 ]
 
 [dependency-groups]
