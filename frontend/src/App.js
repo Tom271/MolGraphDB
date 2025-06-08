@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './App.css';
 import MolecularVisualization from './MolecularVisualization';
+import Docs from './Docs';
 
 function App() {
   const [smiles1, setSmiles1] = useState('');
@@ -8,6 +9,7 @@ function App() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showDocs, setShowDocs] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,8 +65,16 @@ function App() {
     <div className="App">
       <div className="container">
         <header className="header">
-          <h1>🧬 Molecular Similarity Calculator</h1>
-          <p>Calculate graph edit distance between molecules using SMILES notation</p>
+          <button 
+            className="docs-button"
+            onClick={() => setShowDocs(true)}
+            title="View Documentation"
+          >
+            📚 Docs
+          </button>
+          <div className="brand-subtitle">NEarest MOlecule</div>
+          <h1>🧬 NeMo</h1>
+          <p>Advanced molecular similarity analysis using graph edit distance and SMILES notation</p>
         </header>
 
         <form onSubmit={handleSubmit} className="form">
@@ -210,9 +220,11 @@ function App() {
         )}
 
         <footer className="footer">
-          <p>💡 <strong>Tip:</strong> Use simple carbon-based molecules (e.g., CCO, CCCC, C1CCC1) for best results</p>
+          <p>💡 <strong>NeMo Tip:</strong> Use simple carbon-based molecules (e.g., CCO, CCCC, C1CCC1) for optimal molecular similarity analysis</p>
         </footer>
       </div>
+      
+      {showDocs && <Docs onClose={() => setShowDocs(false)} />}
     </div>
   );
 }

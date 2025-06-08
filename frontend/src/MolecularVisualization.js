@@ -320,16 +320,16 @@ const MolecularVisualization = ({ results }) => {
       line.setAttribute('x2', conn.to.x);
       line.setAttribute('y2', conn.to.y);
       
-      let strokeColor = '#cccccc';
+      let strokeColor = '#D4C4A8';
       let strokeWidth = '2';
       
       if (conn.type === 'shared') {
-        strokeColor = '#e74c3c';
+        strokeColor = '#FF7300';
         strokeWidth = '3';
       } else if (conn.type === 'mol1') {
-        strokeColor = '#3498db';
+        strokeColor = '#644D0E';
       } else if (conn.type === 'mol2') {
-        strokeColor = '#2ecc71';
+        strokeColor = '#5C5F28';
       }
       
       line.setAttribute('stroke', strokeColor);
@@ -352,7 +352,7 @@ const MolecularVisualization = ({ results }) => {
       rect.setAttribute('height', config.moleculeSize.height);
       rect.setAttribute('rx', '8');
       rect.setAttribute('fill', '#f8f9fa');
-      rect.setAttribute('stroke', mol.id === 'mol1' ? '#3498db' : '#2ecc71');
+      rect.setAttribute('stroke', mol.id === 'mol1' ? '#644D0E' : '#5C5F28');
       rect.setAttribute('stroke-width', '3');
       group.appendChild(rect);
       
@@ -397,15 +397,15 @@ const MolecularVisualization = ({ results }) => {
       let strokeWidth = '2';
       
       if (sg.source === 'shared') {
-        fillColor = '#fee';
-        strokeColor = '#e74c3c';
+        fillColor = '#FFF5ED';
+        strokeColor = '#FF7300';
         strokeWidth = '3';
       } else if (sg.source === 'mol1') {
-        fillColor = '#eff8ff';
-        strokeColor = '#3498db';
+        fillColor = '#F5F2E8';
+        strokeColor = '#644D0E';
       } else if (sg.source === 'mol2') {
-        fillColor = '#eefff0';
-        strokeColor = '#2ecc71';
+        fillColor = '#F5F6E8';
+        strokeColor = '#5C5F28';
       }
       
       rect.setAttribute('fill', fillColor);
@@ -465,11 +465,11 @@ const MolecularVisualization = ({ results }) => {
     
     // Legend items
     const legendItems = [
-      { color: '#3498db', text: 'Molecule 1 subgraphs', y: 40 },
-      { color: '#2ecc71', text: 'Molecule 2 subgraphs', y: 55 },
-      { color: '#e74c3c', text: 'Shared subgraphs', y: 70 },
-      { color: '#666666', text: 'Hierarchical connections', y: 85 },
-      { color: '#666666', text: '(parent → child subgraphs)', y: 100 }
+      { color: '#644D0E', text: 'Molecule 1 subgraphs', y: 40 },
+      { color: '#5C5F28', text: 'Molecule 2 subgraphs', y: 55 },
+      { color: '#FF7300', text: 'Shared subgraphs', y: 70 },
+      { color: '#D4C4A8', text: 'Hierarchical connections', y: 85 },
+      { color: '#D4C4A8', text: '(parent → child subgraphs)', y: 100 }
     ];
     
     legendItems.forEach(item => {

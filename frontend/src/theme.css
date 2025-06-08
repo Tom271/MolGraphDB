@@ -1,0 +1,55 @@
+/* NeMo (NEarest MOlecule) Brand Colors and Theme */
+
+:root {
+  /* Brand Colors */
+  --field-drab: #644D0E;
+  --dark-moss-green: #5C5F28;
+  --aerospace-orange: #FF5000;
+  --pumpkin: #FF7300;
+  --seal-brown: #4C1900;
+  
+  /* Extended Color Palette */
+  --field-drab-light: #8B6E1E;
+  --field-drab-dark: #4A3A0B;
+  --moss-green-light: #7A7E36;
+  --aerospace-orange-light: #FF6B1F;
+  --pumpkin-light: #FF8A1F;
+  
+  /* Semantic Colors */
+  --primary-color: var(--aerospace-orange);
+  --primary-light: var(--aerospace-orange-light);
+  --primary-dark: var(--seal-brown);
+  
+  --secondary-color: var(--pumpkin);
+  --secondary-light: var(--pumpkin-light);
+  
+  --accent-color: var(--field-drab);
+  --accent-light: var(--field-drab-light);
+  
+  --success-color: var(--dark-moss-green);
+  --success-light: var(--moss-green-light);
+  
+  /* Neutral Colors */
+  --background-primary: #FFFFFF;
+  --background-secondary: #FFF8F3;
+  --background-accent: #FFF5ED;
+  
+  --text-primary: var(--seal-brown);
+  --text-secondary: var(--field-drab);
+  --text-muted: #8B7355;
+  --text-inverse: #FFFFFF;
+  
+  --border-light: #E5DDD0;
+  --border-medium: #D4C4A8;
+  --border-dark: var(--field-drab-light);
+  
+  /* Molecule Colors */
+  --molecule1-color: var(--field-drab);
+  --molecule2-color: var(--dark-moss-green);
+  --shared-color: var(--pumpkin);
+  
+  /* Interactive States */
+  --hover-overlay: rgba(255, 80, 0, 0.1);
+  --active-overlay: rgba(255, 80, 0, 0.2);
+  --focus-shadow: 0 0 0 3px rgba(255, 80, 0, 0.3);
+}

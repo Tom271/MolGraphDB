@@ -1,34 +1,42 @@
 .molecular-visualization {
-  margin-top: 2rem;
-  padding: 1.5rem;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
+  margin-top: 2.5rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--background-secondary), var(--background-accent));
+  border-radius: 16px;
+  border: 2px solid var(--border-light);
+  box-shadow: 0 8px 32px rgba(76, 25, 0, 0.1);
 }
 
 .molecular-visualization h3 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
   text-align: center;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .visualization-description {
   text-align: center;
-  color: #6c757d;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  font-size: 1rem;
   max-width: 800px;
   margin-left: auto;
   margin-right: auto;
+  font-weight: 500;
+  line-height: 1.6;
 }
 
 .svg-container {
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #dee2e6;
+  background: var(--background-primary);
+  border-radius: 12px;
+  border: 2px solid var(--border-medium);
   overflow: auto;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 20px rgba(76, 25, 0, 0.12);
   max-height: 80vh;
   min-height: 600px;
 }
@@ -43,37 +51,42 @@
 .visualization-stats {
   display: flex;
   justify-content: center;
-  gap: 2rem;
-  margin-top: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #dee2e6;
+  gap: 2.5rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: var(--background-primary);
+  border-radius: 12px;
+  border: 2px solid var(--border-light);
+  box-shadow: 0 4px 15px rgba(76, 25, 0, 0.08);
 }
 
 .stat {
   text-align: center;
-  font-size: 0.9rem;
-  color: #495057;
+  font-size: 1rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .stat strong {
-  color: #2c3e50;
+  color: var(--text-secondary);
+  font-weight: 700;
 }
 
 .visualization-placeholder {
   text-align: center;
-  padding: 3rem;
-  color: #6c757d;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 2px dashed #dee2e6;
-  margin-top: 2rem;
+  padding: 3.5rem;
+  color: var(--text-muted);
+  background: var(--background-accent);
+  border-radius: 12px;
+  border: 2px dashed var(--border-dark);
+  margin-top: 2.5rem;
+  box-shadow: 0 4px 15px rgba(76, 25, 0, 0.08);
 }
 
 .visualization-placeholder p {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-weight: 500;
 }
 
 /* Responsive design */
