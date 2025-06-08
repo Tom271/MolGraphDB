@@ -200,6 +200,38 @@ const MolecularVisualization = ({ results }) => {
   };
 
   const addHierarchicalConnections = (layout, mol1X, mol2X, moleculeY, config) => {
+    // First, connect ALL subgraphs to their parent molecules
+    layout.subgraphs.forEach(node => {
+      if (node.source === 'mol1') {
+        // Connect mol1 subgraphs to molecule 1
+        layout.connections.push({
+          from: { x: mol1X, y: moleculeY + config.moleculeSize.height },
+          to: { x: node.x, y: node.y },
+          type: 'mol1'
+        });
+      } else if (node.source === 'mol2') {
+        // Connect mol2 subgraphs to molecule 2
+        layout.connections.push({
+          from: { x: mol2X, y: moleculeY + config.moleculeSize.height },
+          to: { x: node.x, y: node.y },
+          type: 'mol2'
+        });
+      } else if (node.source === 'shared') {
+        // Connect shared subgraphs to both molecules
+        layout.connections.push({
+          from: { x: mol1X, y: moleculeY + config.moleculeSize.height },
+          to: { x: node.x, y: node.y },
+          type: 'shared'
+        });
+        layout.connections.push({
+          from: { x: mol2X, y: moleculeY + config.moleculeSize.height },
+          to: { x: node.x, y: node.y },
+          type: 'shared'
+        });
+      }
+    });
+
+    // Then, add hierarchical connections between subgraphs
     // Group subgraphs by edge count and source
     const subgraphsByEdgeCount = {};
     layout.subgraphs.forEach(node => {
@@ -213,85 +245,39 @@ const MolecularVisualization = ({ results }) => {
     // Sort edge counts in descending order
     const edgeCounts = [...new Set(layout.subgraphs.map(n => n.edgeCount))].sort((a, b) => b - a);
 
+    // Connect subgraphs in hierarchical manner (parent to child)
     edgeCounts.forEach((edgeCount, levelIndex) => {
-      if (levelIndex === 0) {
-        // Connect top-level subgraphs to their respective molecules
-        const mol1Subgraphs = subgraphsByEdgeCount[`${edgeCount}_mol1`] || [];
-        const mol2Subgraphs = subgraphsByEdgeCount[`${edgeCount}_mol2`] || [];
-        const sharedSubgraphs = subgraphsByEdgeCount[`${edgeCount}_shared`] || [];
-
-        // Connect mol1 subgraphs to molecule 1
-        mol1Subgraphs.forEach(node => {
-          layout.connections.push({
-            from: { x: mol1X, y: moleculeY + config.moleculeSize.height },
-            to: { x: node.x, y: node.y },
-            type: 'mol1'
-          });
-        });
-
-        // Connect mol2 subgraphs to molecule 2
-        mol2Subgraphs.forEach(node => {
-          layout.connections.push({
-            from: { x: mol2X, y: moleculeY + config.moleculeSize.height },
-            to: { x: node.x, y: node.y },
-            type: 'mol2'
-          });
-        });
-
-        // Connect shared subgraphs to both molecules
-        sharedSubgraphs.forEach(node => {
-          layout.connections.push({
-            from: { x: mol1X, y: moleculeY + config.moleculeSize.height },
-            to: { x: node.x, y: node.y },
-            type: 'shared'
-          });
-          layout.connections.push({
-            from: { x: mol2X, y: moleculeY + config.moleculeSize.height },
-            to: { x: node.x, y: node.y },
-            type: 'shared'
-          });
-        });
-      } else {
-        // Connect to parent subgraphs (one level up with one more edge)
-        const parentEdgeCount = edgeCounts[levelIndex - 1];
+      if (levelIndex < edgeCounts.length - 1) {
+        // Connect to child subgraphs (one level down with one fewer edge)
+        const childEdgeCount = edgeCounts[levelIndex + 1];
         
         ['mol1', 'mol2', 'shared'].forEach(source => {
-          const currentNodes = subgraphsByEdgeCount[`${edgeCount}_${source}`] || [];
-          const parentNodes = subgraphsByEdgeCount[`${parentEdgeCount}_${source}`] || [];
+          const parentNodes = subgraphsByEdgeCount[`${edgeCount}_${source}`] || [];
+          const childNodes = subgraphsByEdgeCount[`${childEdgeCount}_${source}`] || [];
           
-          // For shared subgraphs, also consider connections to mol1 and mol2 parents
-          let allParentNodes = [...parentNodes];
+          // For shared subgraphs, also consider connections to mol1 and mol2 children
+          let allChildNodes = [...childNodes];
           if (source === 'shared') {
-            allParentNodes = [
-              ...parentNodes,
-              ...(subgraphsByEdgeCount[`${parentEdgeCount}_mol1`] || []),
-              ...(subgraphsByEdgeCount[`${parentEdgeCount}_mol2`] || [])
+            allChildNodes = [
+              ...childNodes,
+              ...(subgraphsByEdgeCount[`${childEdgeCount}_mol1`] || []),
+              ...(subgraphsByEdgeCount[`${childEdgeCount}_mol2`] || [])
             ];
           }
 
-          currentNodes.forEach(currentNode => {
-            // Find the closest parent node (by subgraph containment logic)
-            let bestParent = null;
-            let bestScore = -1;
-
-            allParentNodes.forEach(parentNode => {
-              // Simple heuristic: prefer parents with overlapping nodes
-              // In a real implementation, you'd check if currentNode's subgraph is actually contained in parentNode's subgraph
-              const score = calculateSubgraphSimilarity(currentNode, parentNode);
-              if (score > bestScore) {
-                bestScore = score;
-                bestParent = parentNode;
+          parentNodes.forEach(parentNode => {
+            allChildNodes.forEach(childNode => {
+              // Check if child could be contained in parent
+              const score = calculateSubgraphSimilarity(childNode, parentNode);
+              if (score > 0) {
+                const connectionType = source === 'shared' ? 'shared' : source;
+                layout.connections.push({
+                  from: { x: parentNode.x, y: parentNode.y + config.subgraphSize.height },
+                  to: { x: childNode.x, y: childNode.y },
+                  type: connectionType
+                });
               }
             });
-
-            if (bestParent) {
-              const connectionType = source === 'shared' ? 'shared' : source;
-              layout.connections.push({
-                from: { x: bestParent.x, y: bestParent.y + config.subgraphSize.height },
-                to: { x: currentNode.x, y: currentNode.y },
-                type: connectionType
-              });
-            }
           });
         });
       }
