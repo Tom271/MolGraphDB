@@ -1,0 +1,127 @@
+.molecular-visualization {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.molecular-visualization h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.visualization-description {
+  text-align: center;
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.svg-container {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  overflow: auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  max-height: 80vh;
+  min-height: 600px;
+}
+
+.visualization-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 800px;
+}
+
+.visualization-stats {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.stat {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.stat strong {
+  color: #2c3e50;
+}
+
+.visualization-placeholder {
+  text-align: center;
+  padding: 3rem;
+  color: #6c757d;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 2px dashed #dee2e6;
+  margin-top: 2rem;
+}
+
+.visualization-placeholder p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .visualization-stats {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .svg-container {
+    overflow-x: auto;
+    max-height: 70vh;
+  }
+  
+  .visualization-svg {
+    min-width: 1200px;
+    min-height: 600px;
+  }
+
+  .molecular-visualization {
+    margin-top: 1rem;
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 769px) {
+  .svg-container {
+    max-height: 85vh;
+  }
+}
+
+/* Hover effects for better interactivity */
+.molecular-visualization svg {
+  cursor: default;
+}
+
+/* Animation for when visualization loads */
+.molecular-visualization {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
